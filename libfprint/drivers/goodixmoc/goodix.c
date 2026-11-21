@@ -1068,8 +1068,8 @@ fp_init_version_cb (FpiDeviceGoodixMoc  *self,
   if (g_usb_device_get_pid (
         fpi_device_get_usb_device (FP_DEVICE (self))) == 0x6072)
     {
-      fp_info ("Experimental 6072: version-only initialization");
-      fpi_ssm_mark_completed (self->task_ssm);
+      fp_info ("Experimental 6072: testing template listing");
+      fpi_ssm_jump_to_state (self->task_ssm, GOODIX_INIT_TEMPLATE_LIST);
     }
   else
     {
@@ -1096,6 +1096,30 @@ fp_init_cb_reset_or_complete (FpiDeviceGoodixMoc  *self,
                               gxfp_cmd_response_t *resp,
                               GError              *error)
 {
+  if (g_usb_device_get_pid (fpi_device_get_usb_device (FP_DEVICE (self)))
+      == 0x6072)
+    {
+      if (error)
+        {
+          fp_warn ("6072: template-list query failed");
+          fpi_ssm_mark_failed (self->task_ssm, error);
+          return;
+        }
+
+      if (resp->result != GX_SUCCESS)
+        {
+          fpi_ssm_mark_failed (
+              self->task_ssm,
+              fpi_device_error_new_msg (FP_DEVICE_ERROR_PROTO,
+                                        "6072: template-list result 0x%x",
+                                        resp->result));
+          return;
+        }
+
+      fp_info ("6072: template-list query succeeded");
+      fpi_ssm_mark_completed (self->task_ssm);
+      return;
+    }
   if (error)
     {
       fp_warn ("Template storage appears to have been corrupted! Error was: %s", error->message);
@@ -1148,15 +1172,21 @@ fp_init_sm_run_state (FpiSsm *ssm, FpDevice *device)
                          1,
                          fp_init_version_cb);
       break;
-
     case GOODIX_INIT_CONFIG:
-      goodix_sensor_cmd (self, MOC_CMD0_UPDATE_CONFIG, MOC_CMD1_WRITE_CFG_TO_FLASH,
-                         false,
-                         (guint8 *) self->sensorcfg,
-                         sizeof (gxfp_sensor_cfg_t),
+      if (g_usb_device_get_pid (fpi_device_get_usb_device (device)) == 0x6072)
+        {
+          fpi_ssm_mark_failed (
+              ssm, fpi_device_error_new_msg (
+                       FP_DEVICE_ERROR_NOT_SUPPORTED,
+                       "6072: configuration flash writes disabled"));
+          break;
+        }
+
+      goodix_sensor_cmd (self, MOC_CMD0_UPDATE_CONFIG,
+                         MOC_CMD1_WRITE_CFG_TO_FLASH, false,
+                         (guint8 *)self->sensorcfg, sizeof (gxfp_sensor_cfg_t),
                          fp_init_config_cb);
       break;
-
     case GOODIX_INIT_TEMPLATE_LIST:
       /* List prints to check whether the template DB was corrupted.
        * As of 2022-06-13 there is a known firmware issue that can cause the
@@ -1171,14 +1201,20 @@ fp_init_sm_run_state (FpiSsm *ssm, FpDevice *device)
                          1,
                          fp_init_cb_reset_or_complete);
       break;
-
     case GOODIX_INIT_RESET_DEVICE:
+      if (g_usb_device_get_pid (fpi_device_get_usb_device (device)) == 0x6072)
+        {
+          fpi_ssm_mark_failed (ssm,
+                               fpi_device_error_new_msg (
+                                   FP_DEVICE_ERROR_NOT_SUPPORTED,
+                                   "6072: automatic storage reset disabled"));
+          break;
+        }
+
       fp_warn ("Resetting device storage, you will need to enroll all prints again!");
+
       goodix_sensor_cmd (self, MOC_CMD0_DELETETEMPLATE, MOC_CMD1_DELETE_ALL,
-                         FALSE,
-                         NULL,
-                         0,
-                         fp_init_reset_device_cb);
+                         FALSE, NULL, 0, fp_init_reset_device_cb);
       break;
     }
 
