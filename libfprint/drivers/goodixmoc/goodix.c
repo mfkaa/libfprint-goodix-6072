@@ -207,6 +207,9 @@ fp_cmd_receive_cb (FpiUsbTransfer *transfer,
   /* ack */
   if(header.cmd0 == RESPONSE_PACKAGE_CMD)
     {
+      fp_dbg ("ACK received: expected command=0x%02x, "
+              "acknowledged command=0x%02x, result=0x%02x",
+              data->cmd, cmd_reponse.parse_msg.ack_cmd, cmd_reponse.result);
       if (data->cmd != cmd_reponse.parse_msg.ack_cmd)
         {
           fpi_ssm_mark_failed (transfer->ssm,
@@ -228,6 +231,8 @@ fp_cmd_receive_cb (FpiUsbTransfer *transfer,
                                                      header.cmd0));
       return;
     }
+  fp_dbg ("DATA received: command=0x%02x, result=0x%02x", header.cmd0,
+          cmd_reponse.result);
   if (data->callback)
     data->callback (self, &cmd_reponse, NULL);
 
