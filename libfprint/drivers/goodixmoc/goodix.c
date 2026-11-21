@@ -297,6 +297,25 @@ fp_cmd_ssm_done (FpiSsm *ssm, FpDevice *dev, GError *error)
   /* Notify about the SSM failure from here instead. */
   if (error)
     {
+      const gchar *phase = "UNKNOWN";
+
+      switch (fpi_ssm_get_cur_state (ssm))
+        {
+        case GOODIX_CMD_SEND:
+          phase = "SEND";
+          break;
+        case GOODIX_CMD_GET_ACK:
+          phase = "GET_ACK";
+          break;
+        case GOODIX_CMD_GET_DATA:
+          phase = "GET_DATA";
+          break;
+        default:
+          break;
+        }
+
+      fp_warn ("Goodix command 0x%02x failed during %s: %s", data->cmd, phase,
+               error->message);
       if (data->callback)
         data->callback (self, NULL, error);
       else
