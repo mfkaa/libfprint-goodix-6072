@@ -1062,7 +1062,19 @@ fp_init_version_cb (FpiDeviceGoodixMoc  *self,
     }
   fw_version = g_strndup ((const char *) resp->version_info.fwversion, sizeof (resp->version_info.fwversion));
   fp_info ("Firmware version: %s", fw_version);
-  fpi_ssm_next_state (self->task_ssm);
+
+  /* Experimental 6072: stop before configuration or storage changes. */
+
+  if (g_usb_device_get_pid (
+        fpi_device_get_usb_device (FP_DEVICE (self))) == 0x6072)
+    {
+      fp_info ("Experimental 6072: version-only initialization");
+      fpi_ssm_mark_completed (self->task_ssm);
+    }
+  else
+    {
+      fpi_ssm_next_state (self->task_ssm);
+    }
 }
 
 static void
@@ -1658,6 +1670,7 @@ fpi_device_goodixmoc_init (FpiDeviceGoodixMoc *self)
 static const FpIdEntry id_table[] = {
   { .vid = 0x27c6,  .pid = 0x5840,  },
   { .vid = 0x27c6,  .pid = 0x6014,  },
+  { .vid = 0x27c6,  .pid = 0x6072,  },
   { .vid = 0x27c6,  .pid = 0x6082,  },
   { .vid = 0x27c6,  .pid = 0x6090,  },
   { .vid = 0x27c6,  .pid = 0x6092,  },
