@@ -469,3 +469,21 @@ if valgrind.found() and libfprint_sanitizers.length() == 0
             'LIBFPRINT_TEST_WRAPPER=' + ' '.join(libfprint_wrapper),
         ])
 endif
+if 'goodixmoc' in drivers
+    goodix_proto_test = executable(
+        'test-goodixmoc-proto-6072',
+        'test-goodixmoc-proto-6072.c',
+        dependencies: libfprint_private_dep,
+        include_directories: include_directories(
+            '../libfprint/drivers/goodixmoc',
+        ),
+        link_with: libfprint_drivers,
+    )
+
+    test(
+        'goodixmoc-proto-6072',
+        goodix_proto_test,
+        suite: ['unit-tests', 'goodixmoc'],
+        env: envs,
+    )
+endif
